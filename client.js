@@ -26,6 +26,7 @@ var PoolClient = module.exports = function (config, logger, fourAddressesMod) {
                 var messages = buffer.split('\n');
                 var remain = buffer.slice(-1) === '\n' ? '' : messages.pop();
                 messages.forEach(function (message) {
+
                     if (message === '') return;
                     var messageJson;
                     try {
