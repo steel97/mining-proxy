@@ -2,13 +2,13 @@ var net = require('net');
 var events = require('events');
 var Block = require('./block');
 
-var Proxy = module.exports = function(port, logger){
+var Proxy = module.exports = function (port, logger) {
     var _this = this;
 
     var id = 0
-    function nextId(){
+    function nextId() {
         id += 1;
-        if (id === Number.MAX_VALUE){
+        if (id === Number.MAX_VALUE) {
             id = 0;
         }
         return id;
@@ -16,21 +16,21 @@ var Proxy = module.exports = function(port, logger){
 
     var miners = {};
 
-    this.start = function(){
-        var server = net.createServer(function(socket){
+    this.start = function () {
+        var server = net.createServer(function (socket) {
             var minerId = nextId();
             miners[minerId] = socket;
             logger.info('Miner connected, id: ' + minerId);
 
             socket.setNoDelay(true);
-            
+
             var buffer = Buffer.from([]);
-            socket.on('data', function(data){
+            socket.on('data', function (data) {
                 buffer = Buffer.concat([buffer, data]);
                 var bodyLength = buffer.readUInt32BE();
                 var messageLength = bodyLength + 4;
-                if (buffer.length >= messageLength){
-                    _this.parseMessage(buffer.slice(4, messageLength), function(error){
+                if (buffer.length >= messageLength) {
+                    _this.parseMessage(buffer.slice(4, messageLength), function (error) {
                         if (error) {
                             logger.error('Parse message error: ' + error);
                             socket.destroy();
@@ -39,33 +39,33 @@ var Proxy = module.exports = function(port, logger){
                     buffer = buffer.slice(messageLength);
                 }
             });
-            socket.on('close', function(){
+            socket.on('close', function () {
                 logger.info('Miner connection closed, id: ' + minerId);
                 _this.emit('connectionClosed', minerId);
             });
-            socket.on('error', function(error){
+            socket.on('error', function (error) {
                 logger.error('Miner connection error: ' + error + ', id: ' + minerId);
                 _this.emit('connectionClosed', minerId);
             });
         });
 
-        server.listen(port, function(){
-            _this.on('connectionClosed', function(minerId){
+        server.listen(port, function () {
+            _this.on('connectionClosed', function (minerId) {
                 delete miners[minerId];
             });
-        }).on('listening', function(){
+        }).on('listening', function () {
             var host = server.address();
             logger.info("Proxy started, listening on: " + host.address + ":" + host.port);
         });
     }
 
-    var sizeData = function(size){
+    var sizeData = function (size) {
         var buffer = Buffer.alloc(4);
         buffer.writeUInt32BE(size);
         return buffer;
     }
 
-    var jobData = function(job){
+    var jobData = function (job) {
         return Buffer.concat([
             sizeData(job.fromGroup),
             sizeData(job.toGroup),
@@ -78,8 +78,8 @@ var Proxy = module.exports = function(port, logger){
         ]);
     }
 
-    this.sendMiningJobs = function(jobs){
-        if (Object.keys(miners).length == 0){
+    this.sendMiningJobs = function (jobs) {
+        if (Object.keys(miners).length == 0) {
             return;
         }
 
@@ -89,14 +89,27 @@ var Proxy = module.exports = function(port, logger){
         header.writeUInt8(0x00, 4);
         header.writeUInt32BE(body.length + 5);
         var data = Buffer.concat([header, body]);
-        for (var idx in miners){
+        for (var idx in miners) {
             miners[idx].write(data);
         }
     }
 
-    this.parseMessage = function(buffer, callback){
+    this.sendNonce = function (nonce) {
+        var msg = Buffer.alloc(9); // size (4) + type (1) + (nonce 4)
+        msg.writeUInt32BE(9); // size of message
+        msg.writeUInt8(0x02, 4); // message id
+
+        const nonceBuf = Buffer.from(nonce, "hex");
+        const data = Buffer.concat([msg, nonceBuf]);
+
+        for (var idx in miners) {
+            miners[idx].write(data);
+        }
+    }
+
+    this.parseMessage = function (buffer, callback) {
         var messageType = buffer.readUInt8();
-        if (messageType == 0x00){ // submit message
+        if (messageType == 0x00) { // submit message
             var block = new Block(buffer.slice(5)); // block size + message type
             _this.emit('solution', block);
             callback(null);

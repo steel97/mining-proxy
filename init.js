@@ -7,36 +7,36 @@ var big = require('bignumber.js');
 var winston = require('winston');
 require('winston-daily-rotate-file');
 
-if (!fs.existsSync('config.json')){
+if (!fs.existsSync('config.json')) {
     console.log('config.json does not exist.');
     process.exit(1);
 }
 
-var config = JSON.parse(fs.readFileSync("config.json", {encoding: 'utf8'}));
+var config = JSON.parse(fs.readFileSync("config.json", { encoding: 'utf8' }));
 global.diff1Target = new big(2).pow(256 - config.diff1TargetNumZero).minus(1);
 
-if (config.address && config.addresses){
+if (config.address && config.addresses) {
     console.log('invalid address config');
     process.exit(1);
 }
 
 var fourAddressesMode = config.addresses ? true : false;
-if (fourAddressesMode){
+if (fourAddressesMode) {
     var error = util.validateAdddresses(config.addresses)
-    if (error){
+    if (error) {
         console.log(error);
         process.exit(1);
     }
 }
 else {
     var [_, error] = util.groupOfAddress(config.address);
-    if (error){
+    if (error) {
         console.log('invalid address: ' + error);
         process.exit(1);
     }
 }
 
-if (config.workerName && config.workerName.length > 32){
+if (config.workerName && config.workerName.length > 32) {
     console.log('`workerName` length cannot exceed 32');
     process.exit(1);
 }
@@ -67,10 +67,14 @@ var poolClient = new client(config, logger, fourAddressesMode);
 minerProxy.start();
 poolClient.start();
 
-minerProxy.on('solution', function(block){
+minerProxy.on('solution', function (block) {
     poolClient.submit(block);
 });
 
-poolClient.on('jobs', function(jobs){
+poolClient.on('jobs', function (jobs) {
     minerProxy.sendMiningJobs(jobs);
+});
+
+poolClient.on('nonce', function (nonce) {
+    minerProxy.sendNonce(nonce);
 });

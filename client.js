@@ -38,6 +38,10 @@ var PoolClient = module.exports = function (config, logger, fourAddressesMod) {
                     }
 
                     switch (messageJson.method) {
+                        case "mining.subscribe":
+                            logger.info('Subscribed');
+                            _this.emit("nonce", messageJson.params[0]);
+                            break;
                         case "mining.notify":
                             logger.info('New job received');
                             handleMiningJobs(messageJson.params);
